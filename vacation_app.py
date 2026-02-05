@@ -25,7 +25,7 @@ def save_data(df):
 
 df = load_data()
 
-# 공통 설정: 일정 유형 및 색상 (이름 변경됨: 제안 작업 -> 제안)
+# 공통 설정: 일정 유형 및 색상
 type_options = {
     "🏖️ 휴가 (종일)": "#FF6B6B",   # 빨강
     "🌅 오전 반차": "#FFB347",     # 주황
@@ -46,7 +46,6 @@ with st.sidebar:
     with tab1:
         with st.form("add_event"):
             st.subheader("새 일정 추가")
-            # 예시 이름 변경 (홍길동)
             name = st.text_input("이름", placeholder="예: 홍길동")
             schedule_type = st.selectbox("일정 유형", list(type_options.keys()))
             
@@ -152,6 +151,7 @@ if not df.empty:
             "allDay": True
         })
 
+# 달력 설정
 calendar_options = {
     "editable": "true",
     "navLinks": "true",
@@ -166,9 +166,20 @@ calendar_options = {
     "aspectRatio": 1.8,
 }
 
+# 스타일 설정 (오류 방지를 위해 따로 분리)
+custom_css = """
+    .fc-event-title {
+        font-weight: bold;
+        font-size: 0.85em;
+    }
+    .fc-toolbar-title {
+        font-size: 1.5em !important;
+    }
+"""
+
 st.markdown("### 🗓️ 월별 스케줄")
 
-# 범례 업데이트 (제안)
+# 범례
 st.markdown("""
 <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.9em;">
     <span style="color:#9C27B0; font-weight:bold;">■ 제안</span>
@@ -179,10 +190,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-calendar(events=events, options=calendar_options, custom_css="""
-    .fc-event-title {
-        font-weight: bold;
-        font-size: 0.85em;
-    }
-    .fc-toolbar-
+# 달력 그리기
+calendar(events=events, options=calendar_options, custom_css=custom_css)
 
+st.divider()
+with st.expander("📊 전체 데이터 목록 보기"):
+    st.dataframe(df, use_container_width=True)
