@@ -44,7 +44,7 @@ with st.sidebar:
         
         today = datetime.date.today()
         d = st.date_input("기간 (시작일 ~ 종료일)", (today, today))
-        content = st.text_input("내용", placeholder="예: 캄보디아 ODA 제안서 작성")
+        content = st.text_input("내용", placeholder="예: 인니 보건인력 PMC 제안서 작성")
         
         if st.form_submit_button("등록"):
             if len(d) == 2:
@@ -129,3 +129,4 @@ with st.expander("🗑️ 등록된 일정 목록"):
             save_data(df)
             st.success("삭제되었습니다.")
             st.rerun()
+
