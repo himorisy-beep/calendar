@@ -2,11 +2,11 @@ import streamlit as st
 import pandas as pd
 import datetime
 import os
-from streamlit_calendar import calendar # 달력 라이브러리
+from streamlit_calendar import calendar
 
 # 1. 페이지 설정
 st.set_page_config(page_title="팀 캘린더", layout="wide")
-st.title("📅 우리 팀 통합 달력")
+st.title("📅 해외 팀 통합 달력")
 
 # 데이터 파일
 DATA_FILE = "team_calendar.csv"
@@ -29,20 +29,24 @@ with st.sidebar:
     with st.form("add_event"):
         name = st.text_input("이름", placeholder="예: 홍길동")
         
-        # 유형에 따라 달력에 표시될 색상을 미리 정해둡니다
+        # 유형 및 색상 설정 (반차 추가됨)
         type_options = {
-            "🏖️ 휴가/연차": "#FF6B6B",  # 빨강 (휴가)
-            "✈️ 출장/외근": "#4D96FF",  # 파랑 (출장)
-            "💻 프로젝트": "#6BCB77",   # 초록 (업무)
-            "🔥 긴급/야근": "#FFD93D",  # 노랑 (긴급)
-            "📅 기타": "#A2A2A2"       # 회색 (기타)
+            "🏖️ 휴가 (종일)": "#FF6B6B",   # 빨강 (하루 종일)
+            "🌅 오전 반차": "#FFB347",    # 파스텔 오렌지 (오전에 없음)
+            "🌇 오후 반차": "#FFCC00",    # 진한 노랑 (오후에 없음)
+            "✈️ 출장/외근": "#4D96FF",    # 파랑
+            "💻 프로젝트": "#6BCB77",     # 초록
+            "🔥 긴급/야근": "#A068FF",    # 보라 (눈에 띄게 변경)
+            "📅 기타": "#A2A2A2"         # 회색
         }
+        
+        # 선택박스
         schedule_type = st.selectbox("일정 유형", list(type_options.keys()))
         
         # 날짜
         today = datetime.date.today()
         d = st.date_input("기간", (today, today))
-        content = st.text_input("내용", placeholder="예: 제안서 마감")
+        content = st.text_input("내용", placeholder="예: 개인 사정, 병원 진료 등")
         
         if st.form_submit_button("등록"):
             if len(d) == 2:
@@ -59,16 +63,14 @@ with st.sidebar:
                 st.success("등록 완료!")
                 st.rerun()
 
-# 4. 메인 화면: 진짜 달력 그리기
-# 데이터프레임을 달력 라이브러리가 이해할 수 있는 리스트 형태로 변환
+# 4. 메인 화면: 달력 표시
 events = []
 if not df.empty:
     for _, row in df.iterrows():
-        # 색상 지정
+        # 유형에 맞는 색상 가져오기 (없으면 기본 파랑)
         color = type_options.get(row["유형"], "#3788d8")
         
-        # 달력에 표시할 데이터 만들기
-        # 주의: 종료일에 +1일을 해야 달력에 꽉 차게 표시됩니다 (라이브러리 특성)
+        # 종료일 보정 (+1일 해야 달력에 맞게 표시됨)
         end_date_obj = pd.to_datetime(row["종료일"]) + datetime.timedelta(days=1)
         
         events.append({
@@ -77,38 +79,41 @@ if not df.empty:
             "end": end_date_obj.strftime("%Y-%m-%d"),
             "backgroundColor": color,
             "borderColor": color,
+            # 반차인 경우 'allDay' 속성을 조절할 수도 있지만, 
+            # 간단히 색상으로 구분하는 것이 달력 보기엔 가장 깔끔합니다.
         })
 
-# 달력 설정 (옵션)
+# 달력 옵션
 calendar_options = {
     "editable": "true",
     "navLinks": "true",
     "headerToolbar": {
         "left": "today prev,next",
         "center": "title",
-        "right": "dayGridMonth,timeGridWeek,timeGridDay,listMonth"
+        "right": "dayGridMonth,listMonth" 
     },
-    "initialView": "dayGridMonth", # 기본을 월별 달력으로 설정
+    "initialView": "dayGridMonth",
 }
 
 # 달력 출력
-st.markdown("### 🗓️ 월별 스케줄 확인")
+st.markdown("### 🗓️ 월별 스케줄 (반차 포함)")
+st.info("💡 팁: '오전 반차'는 주황색, '오후 반차'는 노란색으로 표시됩니다.")
+
 calendar(events=events, options=calendar_options, custom_css="""
     .fc-event-title {
         font-weight: bold;
     }
 """)
 
-# 5. 리스트 및 삭제 기능
+# 5. 리스트 및 삭제
 st.divider()
 with st.expander("🗑️ 일정 목록 및 삭제"):
     st.dataframe(df, use_container_width=True)
     
     del_idx = st.selectbox("삭제할 일정 선택", df.index, 
-                           format_func=lambda x: f"{df.loc[x,'이름']} - {df.loc[x,'내용']}")
+                           format_func=lambda x: f"[{df.loc[x,'유형']}] {df.loc[x,'이름']} - {df.loc[x,'내용']}")
     if st.button("삭제하기"):
         df = df.drop(del_idx)
         save_data(df)
         st.success("삭제되었습니다.")
         st.rerun()
-
