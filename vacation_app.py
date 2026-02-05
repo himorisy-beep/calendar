@@ -14,6 +14,7 @@ DATA_FILE = "team_calendar.csv"
 # 2. 데이터 관리 함수
 def load_data():
     if not os.path.exists(DATA_FILE):
+        # 인덱스 관리를 위해 데이터프레임 생성 시 인덱스를 명확히 합니다.
         return pd.DataFrame(columns=["이름", "시작일", "종료일", "유형", "내용"])
     df = pd.read_csv(DATA_FILE)
     df['시작일'] = df['시작일'].astype(str)
@@ -23,137 +24,138 @@ def load_data():
 def save_data(df):
     df.to_csv(DATA_FILE, index=False)
 
-df = load_data()
+# 전역 데이터 로드
+if "df" not in st.session_state:
+    st.session_state.df = load_data()
 
 # 공통 설정: 일정 유형 및 색상
 type_options = {
+    "📑 제안": "#9C27B0",         # 보라
+    "💻 프로젝트": "#6BCB77",      # 초록
     "🏖️ 휴가 (종일)": "#FF6B6B",   # 빨강
     "🌅 오전 반차": "#FFB347",     # 주황
     "🌇 오후 반차": "#FFCC00",     # 노랑
     "✈️ 출장/외근": "#4D96FF",     # 파랑
-    "📑 제안": "#9C27B0",         # 보라
-    "💻 프로젝트": "#6BCB77",      # 초록
     "🔥 긴급/야근": "#E91E63",     # 진분홍
     "📅 기타": "#A2A2A2"          # 회색
 }
 
-# 3. 사이드바: 탭으로 기능 분리
-with st.sidebar:
-    st.header("관리 메뉴")
-    tab1, tab2 = st.tabs(["📝 일정 등록", "🛠️ 수정/삭제"])
-
-    # --- [탭 1] 일정 등록 ---
-    with tab1:
-        with st.form("add_event"):
-            st.subheader("새 일정 추가")
-            name = st.text_input("이름", placeholder="예: 홍길동")
-            schedule_type = st.selectbox("일정 유형", list(type_options.keys()))
-            
-            today = datetime.date.today()
-            d = st.date_input("기간 (시작 ~ 종료)", (today, today))
-            content = st.text_input("내용", placeholder="예: 제안서 작성")
-            
-            if st.form_submit_button("등록하기"):
-                if len(d) == 2:
-                    start, end = d
-                    new_row = pd.DataFrame({
-                        "이름": [name],
-                        "시작일": [start],
-                        "종료일": [end],
-                        "유형": [schedule_type],
-                        "내용": [content]
-                    })
-                    df = pd.concat([df, new_row], ignore_index=True)
-                    save_data(df)
-                    st.success("등록되었습니다!")
-                    st.rerun()
-                else:
-                    st.error("기간을 정확히 선택해주세요.")
-
-    # --- [탭 2] 일정 수정 및 삭제 ---
-    with tab2:
-        st.subheader("일정 고치기")
-        if not df.empty:
-            edit_idx = st.selectbox(
-                "수정할 일정 선택",
-                df.index,
-                format_func=lambda x: f"[{df.loc[x,'유형']}] {df.loc[x,'이름']} - {df.loc[x,'내용']}"
-            )
-
-            target_row = df.loc[edit_idx]
-
-            with st.form("edit_form"):
-                st.write("🔻 내용 수정")
-                new_name = st.text_input("이름", value=target_row['이름'])
-                
-                try:
-                    type_index = list(type_options.keys()).index(target_row['유형'])
-                except ValueError:
-                    type_index = 0
-                new_type = st.selectbox("일정 유형", list(type_options.keys()), index=type_index)
-
-                try:
-                    s_date = datetime.datetime.strptime(str(target_row['시작일']), "%Y-%m-%d").date()
-                    e_date = datetime.datetime.strptime(str(target_row['종료일']), "%Y-%m-%d").date()
-                except:
-                    s_date = datetime.date.today()
-                    e_date = datetime.date.today()
-                
-                new_dates = st.date_input("기간", (s_date, e_date))
-                new_content = st.text_input("내용", value=target_row['내용'])
-
-                col_edit, col_del = st.columns(2)
-                update_submit = col_edit.form_submit_button("수정 저장", type="primary")
-                delete_submit = col_del.form_submit_button("🗑️ 삭제")
-
-                if update_submit:
-                    if len(new_dates) == 2:
-                        df.at[edit_idx, '이름'] = new_name
-                        df.at[edit_idx, '유형'] = new_type
-                        df.at[edit_idx, '시작일'] = new_dates[0]
-                        df.at[edit_idx, '종료일'] = new_dates[1]
-                        df.at[edit_idx, '내용'] = new_content
-                        save_data(df)
-                        st.success("수정 완료!")
-                        st.rerun()
-                    else:
-                        st.error("날짜를 정확히 선택해주세요.")
-
-                if delete_submit:
-                    df = df.drop(edit_idx)
-                    save_data(df)
-                    st.success("삭제되었습니다.")
-                    st.rerun()
-        else:
-            st.info("수정할 일정이 없습니다.")
-
-# 4. 메인 화면: 달력 표시
-events = []
-if not df.empty:
-    for _, row in df.iterrows():
-        color = type_options.get(row["유형"], "#3788d8")
+# --- [기능 1] 팝업창(Dialog) 함수 정의 ---
+@st.dialog("✏️ 일정 수정/삭제")
+def open_edit_modal(idx, row):
+    # 팝업창 내부 디자인
+    st.write(f"**{row['이름']}**님의 일정을 수정합니다.")
+    
+    with st.form("modal_form"):
+        new_name = st.text_input("이름", value=row['이름'])
         
+        # 유형 선택
+        try:
+            type_index = list(type_options.keys()).index(row['유형'])
+        except ValueError:
+            type_index = 0
+        new_type = st.selectbox("일정 유형", list(type_options.keys()), index=type_index)
+
+        # 날짜 처리
+        try:
+            s_date = datetime.datetime.strptime(str(row['시작일']), "%Y-%m-%d").date()
+            e_date = datetime.datetime.strptime(str(row['종료일']), "%Y-%m-%d").date()
+        except:
+            s_date = datetime.date.today()
+            e_date = datetime.date.today()
+            
+        new_dates = st.date_input("기간", (s_date, e_date))
+        new_content = st.text_input("내용", value=row['내용'])
+        
+        col1, col2 = st.columns(2)
+        submit = col1.form_submit_button("💾 수정 저장", type="primary")
+        delete = col2.form_submit_button("🗑️ 삭제하기")
+
+        if submit:
+            if len(new_dates) == 2:
+                # 데이터 수정
+                st.session_state.df.at[idx, '이름'] = new_name
+                st.session_state.df.at[idx, '유형'] = new_type
+                st.session_state.df.at[idx, '시작일'] = new_dates[0]
+                st.session_state.df.at[idx, '종료일'] = new_dates[1]
+                st.session_state.df.at[idx, '내용'] = new_content
+                save_data(st.session_state.df)
+                st.rerun()
+            else:
+                st.error("기간을 확인해주세요.")
+        
+        if delete:
+            st.session_state.df = st.session_state.df.drop(idx).reset_index(drop=True)
+            save_data(st.session_state.df)
+            st.rerun()
+
+# --- [기능 2] 사이드바 (등록 기능만 남김) ---
+with st.sidebar:
+    st.header("📝 새 일정 등록")
+    with st.form("add_event"):
+        name = st.text_input("이름", placeholder="예: 홍길동")
+        schedule_type = st.selectbox("일정 유형", list(type_options.keys()))
+        today = datetime.date.today()
+        d = st.date_input("기간", (today, today))
+        content = st.text_input("내용", placeholder="예: 제안서 작성")
+        
+        if st.form_submit_button("등록하기"):
+            if len(d) == 2:
+                start, end = d
+                new_row = pd.DataFrame({
+                    "이름": [name],
+                    "시작일": [start],
+                    "종료일": [end],
+                    "유형": [schedule_type],
+                    "내용": [content]
+                })
+                st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
+                save_data(st.session_state.df)
+                st.success("등록되었습니다!")
+                st.rerun()
+
+# --- [기능 3] 메인 화면: 달력 ---
+events = []
+df = st.session_state.df
+
+if not df.empty:
+    for idx, row in df.iterrows():
+        color = type_options.get(row["유형"], "#3788d8")
         start_str = str(row["시작일"])
         end_str = str(row["종료일"])
-        
-        try:
-            end_date_obj = pd.to_datetime(end_str) + datetime.timedelta(days=1)
-            end_date_str = end_date_obj.strftime("%Y-%m-%d")
-        except:
-            end_date_str = end_str
 
-        events.append({
+        # 이벤트 객체 생성 (extendedProps에 인덱스 정보 숨겨두기 ★중요)
+        event_dict = {
             "title": f"[{row['이름']}] {row['내용']}",
-            "start": start_str,
-            "end": end_date_str,
             "backgroundColor": color,
             "borderColor": color,
-            "allDay": True
-        })
+            "extendedProps": {"index": idx} # 클릭했을 때 몇 번째 데이터인지 알기 위해
+        }
 
-# 달력 설정
+        # 반차/종일 구분 로직
+        if row["유형"] == "🌅 오전 반차":
+            event_dict["start"] = f"{start_str}T09:00:00"
+            event_dict["end"] = f"{start_str}T13:00:00"
+            event_dict["allDay"] = False
+        elif row["유형"] == "🌇 오후 반차":
+            event_dict["start"] = f"{start_str}T14:00:00"
+            event_dict["end"] = f"{start_str}T18:00:00"
+            event_dict["allDay"] = False
+        else:
+            event_dict["start"] = start_str
+            # 종일 일정 날짜 보정
+            try:
+                end_date_obj = pd.to_datetime(end_str) + datetime.timedelta(days=1)
+                event_dict["end"] = end_date_obj.strftime("%Y-%m-%d")
+            except:
+                event_dict["end"] = end_str
+            event_dict["allDay"] = True
+            
+        events.append(event_dict)
+
+# 달력 옵션
 calendar_options = {
-    "editable": "true",
+    "editable": "true", # 드래그 앤 드롭 가능
     "navLinks": "true",
     "headerToolbar": {
         "left": "today prev,next",
@@ -164,22 +166,10 @@ calendar_options = {
     "height": 700,
     "contentHeight": 650,
     "aspectRatio": 1.8,
+    "selectable": "true",
 }
 
-# 스타일 설정 (오류 방지를 위해 따로 분리)
-custom_css = """
-    .fc-event-title {
-        font-weight: bold;
-        font-size: 0.85em;
-    }
-    .fc-toolbar-title {
-        font-size: 1.5em !important;
-    }
-"""
-
-st.markdown("### 🗓️ 월별 스케줄")
-
-# 범례
+# 범례 표시
 st.markdown("""
 <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.9em;">
     <span style="color:#9C27B0; font-weight:bold;">■ 제안</span>
@@ -190,9 +180,27 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# 달력 그리기
-calendar(events=events, options=calendar_options, custom_css=custom_css)
+# 달력 그리기 & 클릭 이벤트 감지
+calendar_state = calendar(
+    events=events, 
+    options=calendar_options, 
+    custom_css="""
+    .fc-event-title { font-weight: bold; font-size: 0.85em; }
+    .fc-toolbar-title { font-size: 1.5em !important; }
+    """,
+    key="my_calendar" # 키 값 지정
+)
 
-st.divider()
-with st.expander("📊 전체 데이터 목록 보기"):
-    st.dataframe(df, use_container_width=True)
+# --- [핵심] 클릭 시 팝업 띄우기 ---
+if calendar_state.get("eventClick"):
+    # 클릭된 이벤트 정보 가져오기
+    clicked_event = calendar_state["eventClick"]["event"]
+    
+    # 숨겨둔 인덱스(idx) 찾기
+    clicked_idx = clicked_event["extendedProps"]["index"]
+    
+    # 해당 데이터 행 가져오기
+    target_row = df.loc[clicked_idx]
+    
+    # 팝업 함수 실행
+    open_edit_modal(clicked_idx, target_row)
