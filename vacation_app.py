@@ -65,8 +65,8 @@ def open_edit_modal(idx, row):
         col1, col2 = st.columns(2)
         
         # [수정됨] type="primary"를 제거하여 기본 회색 버튼으로 변경
-        submit = col1.form_submit_button("💾 수정 저장") 
-        delete = col2.form_submit_button("🗑️ 삭제하기")
+        submit = col1.form_submit_button("💾 수정") 
+        delete = col2.form_submit_button("🗑️ 삭제")
 
         if submit:
             if len(new_dates) == 2:
@@ -210,3 +210,4 @@ if calendar_state.get("eventClick"):
     clicked_idx = clicked_event["extendedProps"]["index"]
     target_row = df.loc[clicked_idx]
     open_edit_modal(clicked_idx, target_row)
+
