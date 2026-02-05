@@ -27,7 +27,7 @@ df = load_data()
 with st.sidebar:
     st.header("📝 일정 추가하기")
     with st.form("add_event"):
-        name = st.text_input("이름", placeholder="예: 반세영")
+        name = st.text_input("이름", placeholder="예: 홍길동")
         
         # 유형에 따라 달력에 표시될 색상을 미리 정해둡니다
         type_options = {
@@ -111,3 +111,4 @@ with st.expander("🗑️ 일정 목록 및 삭제"):
         save_data(df)
         st.success("삭제되었습니다.")
         st.rerun()
+
