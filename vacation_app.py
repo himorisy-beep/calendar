@@ -27,12 +27,12 @@ df = load_data()
 
 # 공통 설정: 일정 유형 및 색상 (이름 변경됨: 제안 작업 -> 제안)
 type_options = {
-    "📑 제안": "#9C27B0",         # 보라
-    "💻 프로젝트": "#6BCB77",      # 초록
     "🏖️ 휴가 (종일)": "#FF6B6B",   # 빨강
     "🌅 오전 반차": "#FFB347",     # 주황
     "🌇 오후 반차": "#FFCC00",     # 노랑
     "✈️ 출장/외근": "#4D96FF",     # 파랑
+    "📑 제안": "#9C27B0",         # 보라
+    "💻 프로젝트": "#6BCB77",      # 초록
     "🔥 긴급/야근": "#E91E63",     # 진분홍
     "📅 기타": "#A2A2A2"          # 회색
 }
@@ -185,3 +185,4 @@ calendar(events=events, options=calendar_options, custom_css="""
         font-size: 0.85em;
     }
     .fc-toolbar-
+
